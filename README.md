@@ -12,9 +12,9 @@ Let's assume you have the following table:
 
 ```sql
 CREATE TABLE users (
-	id INTEGER PRIMARY KEY, 
-	name TEXT, 
-	password TEXT 
+  id INTEGER PRIMARY KEY, 
+  name TEXT, 
+  password TEXT 
 );
 ```
 
@@ -31,10 +31,10 @@ Now you can setup a new class to represent this table:
  * @property string $password
  */ 
 class User extends flight\ActiveRecord {
-	public function __construct($databaseConnection)
-	{
-		parent::__construct($databaseConnection, 'users', [ /* custom values */ ]);
-	}
+  public function __construct($databaseConnection)
+  {
+    parent::__construct($databaseConnection, 'users', [/* custom values */]);
+  }
 }
 ```
 
