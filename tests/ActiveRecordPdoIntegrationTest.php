@@ -235,7 +235,7 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
 
         $user->isNotNull('id')->eq('id', 1)->lt('id', 2)->gt('id', 0)->find();
         $sql = $user->getBuiltSql();
-        $this->assertStringContainsString('SELECT "user".* FROM "user" WHERE "user"."id" IS NOT NULL AND "user"."id" = 1 AND "user"."id" < 2 AND "user"."id" > 0', $sql);
+        $this->assertStringContainsString('SELECT "user".* FROM "user" WHERE "user"."id" IS NOT NULL AND "user"."id" = :ph3 AND "user"."id" < :ph4 AND "user"."id" > :ph5', $sql);
         $this->assertGreaterThan(0, $user->id);
         $this->assertSame([], $user->getDirty());
         $user->name = 'testname';
@@ -685,7 +685,7 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
             ->eq('id', 2)
             ->find();
         $sql = $record->getBuiltSql();
-        $this->assertEquals('SELECT "user".* FROM "user" WHERE "user"."name" IS NOT NULL AND ("user"."name" = :ph1 OR "user"."id" = 1 OR "user"."password" >= :ph2) AND "user"."id" = 2 LIMIT 1', $sql);
+        $this->assertEquals('SELECT "user".* FROM "user" WHERE "user"."name" IS NOT NULL AND ("user"."name" = :ph1 OR "user"."id" = :ph2 OR "user"."password" >= :ph3) AND "user"."id" = :ph4 LIMIT 1', $sql);
     }
 
     public function testWrapWithComplexLogic()
@@ -702,7 +702,7 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
             ->join('contact', '"contact"."user_id" = "user"."id"')
             ->find();
         $sql = $record->getBuiltSql();
-        $this->assertEquals('SELECT "user".* FROM "user" LEFT JOIN contact ON "contact"."user_id" = "user"."id" WHERE ("user"."name" = :ph1 OR "user"."id" IN (:ph2,:ph3,:ph4) OR "user"."id" = 1) AND "user"."name" IS NOT NULL AND "user"."id" BETWEEN :ph5 AND :ph6 LIMIT 1', $sql);
+        $this->assertEquals('SELECT "user".* FROM "user" LEFT JOIN contact ON "contact"."user_id" = "user"."id" WHERE ("user"."name" = :ph1 OR "user"."id" IN (:ph2,:ph3,:ph4) OR "user"."id" = :ph5) AND "user"."name" IS NOT NULL AND "user"."id" BETWEEN :ph6 AND :ph7 LIMIT 1', $sql);
     }
 
     public function testOrAsFinalParameter()
@@ -714,6 +714,26 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
             ->eq('id', 1, 'or')
             ->find();
         $sql = $record->getBuiltSql();
-        $this->assertEquals('SELECT "user".* FROM "user" WHERE "user"."name" = :ph1 AND "user"."id" IN (:ph2,:ph3,:ph4) OR "user"."id" = 1 LIMIT 1', $sql);
+        $this->assertEquals('SELECT "user".* FROM "user" WHERE "user"."name" = :ph1 AND "user"."id" IN (:ph2,:ph3,:ph4) OR "user"."id" = :ph5 LIMIT 1', $sql);
     }
+
+	public function testBooleanParam()
+	{
+		$record = new User(new PDO('sqlite:test.db'));
+		$record->eq('name', 'John');
+		$record->eq('id', true);
+		$record->find();
+		$sql = $record->getBuiltSql();
+		$this->assertEquals('SELECT "user".* FROM "user" WHERE "user"."name" = :ph1 AND "user"."id" = TRUE LIMIT 1', $sql);
+	}
+
+	public function testBooleanParamWithArray()
+	{
+		$record = new User(new PDO('sqlite:test.db'));
+		$record->eq('name', 'John');
+		$record->in('id', [ true, false ]);
+		$record->find();
+		$sql = $record->getBuiltSql();
+		$this->assertEquals('SELECT "user".* FROM "user" WHERE "user"."name" = :ph1 AND "user"."id" IN (TRUE,FALSE) LIMIT 1', $sql);
+	}
 }

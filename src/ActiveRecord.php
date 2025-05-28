@@ -100,7 +100,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     /**
      * Database connection
      *
-     * @var DatabaseInterface|null
+     * @var DatabaseInterface|PDO|mysqli|null
      */
     protected ?DatabaseInterface $databaseConnection;
 
@@ -563,7 +563,6 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     public function execute(string $sql, array $params = []): DatabaseStatementInterface
     {
         $statement = $this->databaseConnection->prepare($sql);
-
         $statement->execute($params);
 
         // Now that the query has run, reset the data in the object
@@ -755,15 +754,17 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     {
         if (is_array($value)) {
             foreach ($value as $key => $val) {
-                $this->params[$value[$key] = ActiveRecordData::PREFIX . ++$this->count] = $val;
+				$value[$key] = $this->filterParam($val);
             }
-        } elseif (is_string($value)) {
+        } elseif ($value === null) {
+            $value = 'NULL';
+        } elseif (is_bool($value) === true && is_int($value) === false && is_float($value) === false) {
+            $value = $value ? 'TRUE' : 'FALSE';
+        } else {
             $ph = ActiveRecordData::PREFIX . ++$this->count;
             $this->params[$ph] = $value;
             $value = $ph;
-        } elseif ($value === null) {
-            $value = 'NULL';
-        }
+		}
         return $value;
     }
 
