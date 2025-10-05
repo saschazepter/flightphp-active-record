@@ -430,12 +430,12 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     /**
      * function to find one record and assign in to current object.
      * @param int|string $id If call this function using this param, will find record by using this id. If not set, just find the first record in database.
-     * @return bool|ActiveRecord if find record, assign in to current object and return it, other wise return "false".
+     * @return ActiveRecord Returns a hydrated ActiveRecord object if found, otherwise returns an empty ActiveRecord object.
      */
     public function find($id = null)
     {
         if ($id !== null) {
-            $this->resetQueryData()->eq($this->primaryKey, $id);
+            $this->eq($this->primaryKey, $id);
         }
 
         $this->processEvent('beforeFind', [ $this ]);
@@ -446,6 +446,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
 
         return $result;
     }
+
     /**
      * function to find all records in database.
      * @return array<int,ActiveRecord> return array of ActiveRecord
@@ -577,7 +578,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
      * @param array $param The param will be bind to PDOStatement.
      * @param ActiveRecord|null $obj The object, if find record in database, will assign the attributes in to this object.
      * @param bool $single if set to true, will find record and fetch in current object, otherwise will find all records.
-     * @return bool|ActiveRecord|array
+     * @return ActiveRecord|array
      */
     public function query(string $sql, array $param = [], ?ActiveRecord $obj = null, bool $single = false)
     {
