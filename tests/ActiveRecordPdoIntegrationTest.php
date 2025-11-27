@@ -748,4 +748,33 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
 		$sql = $record->getBuiltSql();
 		$this->assertEquals('SELECT "user".* FROM "user" WHERE "user"."name" = :ph1 AND "user"."id" IN (TRUE,FALSE) LIMIT 1', $sql);
 	}
+
+    public function testHasManyInvalidRelation()
+    {
+        $user = new class(new PDO('sqlite:test.db')) extends User {
+            public array $relations = [
+                'invalid_relation' => [] // Invalid - missing required elements
+            ];
+        };
+        
+        $user->name = 'demo';
+        $user->password = md5('demo');
+        $user->insert();
+        
+        // Should return empty array for invalid relation instead of throwing exception
+        $this->assertIsArray($user->invalid_relation);
+        $this->assertEmpty($user->invalid_relation);
+    }
+    public function testHasManyEmptyRelation()
+    {
+        $user = new User(new PDO('sqlite:test.db'));
+        $user->name = 'demo';
+        $user->password = md5('demo');
+        $user->insert();
+        
+        // No contacts exist for this user
+        $this->assertEmpty($user->contacts);
+        $this->assertIsArray($user->contacts);
+        $this->assertEquals(0, count($user->contacts));
+    }
 }

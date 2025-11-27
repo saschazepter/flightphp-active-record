@@ -619,13 +619,15 @@ abstract class ActiveRecord extends Base implements JsonSerializable
         }
 
         $relation = $this->relations[$name];
-        if (is_array($relation) === true) {
+        if (is_array($relation) === true && isset($relation[0])) {
             // ActiveRecordData::BELONGS_TO etc
             $relation_type_or_object_name = $relation[0];
             $relation_class = $relation[1] ?? '';
             $relation_local_key = $relation[2] ?? '';
             $relation_array_callbacks = $relation[3] ?? [];
             $relation_back_reference = $relation[4] ?? '';
+        } else {
+            return $relation;
         }
 
         if ($relation instanceof self || $relation_type_or_object_name instanceof self) {
@@ -643,7 +645,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable
         if ((!$relation instanceof self) && self::HAS_ONE === $relation_type_or_object_name) {
             $obj->eq($relation_local_key, $this->{$this->primaryKey})->find() && $relation_back_reference && $obj->__set($relation_back_reference, $this);
         } elseif (self::HAS_MANY === $relation_type_or_object_name) {
-            $this->relations[$name] = $obj->eq($relation_local_key, $this->{$this->primaryKey})->findAll();
+            $results = $obj->eq($relation_local_key, $this->{$this->primaryKey})->findAll();
+            $this->relations[$name] = $results ?: [];
             if ($relation_back_reference) {
                 foreach ($this->relations[$name] as $o) {
                     $o->__set($relation_back_reference, $this);
