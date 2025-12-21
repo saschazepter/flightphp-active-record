@@ -135,6 +135,13 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     protected array $relations = [];
 
     /**
+     * Relationships to eager load
+     *
+     * @var array
+     */
+    protected array $eagerLoad = [];
+
+    /**
      * These are variables that are custom to the model, but not part of the database
      *
      * @var array
@@ -160,7 +167,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
      */
     public function __construct($databaseConnection = null, ?string $table = '', array $config = [])
     {
-        $this->processEvent('onConstruct', [ $this, &$config ]);
+        $this->processEvent('onConstruct', [$this, &$config]);
         $rawConnection = null;
         if ($databaseConnection !== null && ($databaseConnection instanceof DatabaseInterface) === false) {
             $rawConnection = $databaseConnection;
@@ -213,7 +220,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
                 'target' => implode(', ', $args)
             ]);
         } elseif (method_exists($this->databaseConnection, $name) === true) {
-            return call_user_func_array([ $this->databaseConnection, $name ], $args);
+            return call_user_func_array([$this->databaseConnection, $name], $args);
         }
         return $this;
     }
@@ -337,6 +344,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
         $this->params = [];
         $this->sqlExpressions = [];
         $this->join = null;
+        $this->eagerLoad = [];
         return $this;
     }
     /**
@@ -438,11 +446,20 @@ abstract class ActiveRecord extends Base implements JsonSerializable
             $this->eq($this->primaryKey, $id);
         }
 
-        $this->processEvent('beforeFind', [ $this ]);
+        $this->processEvent('beforeFind', [$this]);
+
+        // Save eager load array before resetQueryData() clears it
+        $eagerLoad = $this->eagerLoad;
 
         $result = $this->query($this->limit(1)->buildSql(['select', 'from', 'join', 'where', 'group', 'having', 'order', 'limit', 'offset']), $this->params, $this->resetQueryData(), true);
 
-        $this->processEvent('afterFind', [ $result ]);
+        // Eager load relationships if specified (wrap in array for consistency)
+        if (count($eagerLoad) > 0 && $result->isHydrated()) {
+            $this->eagerLoad = $eagerLoad;
+            $this->loadEagerRelations([$result]);
+        }
+
+        $this->processEvent('afterFind', [$result]);
 
         return $result;
     }
@@ -453,9 +470,20 @@ abstract class ActiveRecord extends Base implements JsonSerializable
      */
     public function findAll(): array
     {
-        $this->processEvent('beforeFindAll', [ $this ]);
+        $this->processEvent('beforeFindAll', [$this]);
+
+        // Save eager load array before resetQueryData() clears it
+        $eagerLoad = $this->eagerLoad;
+
         $results = $this->query($this->buildSql(['select', 'from', 'join', 'where', 'group', 'having', 'order', 'limit', 'offset']), $this->params, $this->resetQueryData());
-        $this->processEvent('afterFindAll', [ $results ]);
+
+        // Eager load relationships if specified
+        if (count($eagerLoad) > 0 && count($results) > 0) {
+            $this->eagerLoad = $eagerLoad;
+            $this->loadEagerRelations($results);
+        }
+
+        $this->processEvent('afterFindAll', [$results]);
         return $results;
     }
     /**
@@ -464,12 +492,12 @@ abstract class ActiveRecord extends Base implements JsonSerializable
      */
     public function delete()
     {
-        $this->processEvent('beforeDelete', [ $this ]);
+        $this->processEvent('beforeDelete', [$this]);
         if (empty($this->sqlExpressions['where'])) {
             $this->eq($this->primaryKey, $this->{$this->primaryKey});
         }
         $result = $this->execute($this->buildSql(['delete', 'from', 'where']), $this->params);
-        $this->processEvent('afterDelete', [ $this ]);
+        $this->processEvent('afterDelete', [$this]);
         return $result instanceof DatabaseStatementInterface;
     }
     /**
@@ -479,7 +507,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     public function insert(): ActiveRecord
     {
         // execute this before anything else, this could change $this->dirty
-        $this->processEvent([ 'beforeInsert', 'beforeSave' ], [ $this ]);
+        $this->processEvent(['beforeInsert', 'beforeSave'], [$this]);
 
         if (count($this->dirty) === 0) {
             return $this->resetQueryData();
@@ -503,7 +531,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
 
         $this->{$this->primaryKey} = $intentionallyAssignedPrimaryKey ?: $this->databaseConnection->lastInsertId();
 
-        $this->processEvent([ 'afterInsert', 'afterSave' ], [ $this ]);
+        $this->processEvent(['afterInsert', 'afterSave'], [$this]);
 
         $this->isHydrated = true;
 
@@ -515,7 +543,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
      */
     public function update(): ActiveRecord
     {
-        $this->processEvent([ 'beforeUpdate', 'beforeSave' ], [ $this ]);
+        $this->processEvent(['beforeUpdate', 'beforeSave'], [$this]);
 
         foreach ($this->dirty as $field => $value) {
             $this->addCondition($field, '=', $value, ',', 'set');
@@ -526,7 +554,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
             $this->execute($this->eq($this->primaryKey, $this->{$this->primaryKey})->buildSql(['update', 'set', 'where']), $this->params);
         }
 
-        $this->processEvent([ 'afterUpdate', 'afterSave' ], [ $this ]);
+        $this->processEvent(['afterUpdate', 'afterSave'], [$this]);
 
         return $this->dirty()->resetQueryData();
     }
@@ -638,7 +666,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
         $this->relations[$name] = $obj;
         if ($relation_array_callbacks) {
             foreach ($relation_array_callbacks as $method => $args) {
-                call_user_func_array([ $obj, $method ], (array) $args);
+                call_user_func_array([$obj, $method], (array) $args);
             }
         }
 
@@ -656,6 +684,190 @@ abstract class ActiveRecord extends Base implements JsonSerializable
             $obj->eq($obj->primaryKey, $this->{$relation_local_key})->find() && $relation_back_reference && $obj->__set($relation_back_reference, $this);
         }
         return $this->relations[$name];
+    }
+
+    /**
+     * Specify relationships to eager load
+     *
+     * @param string|array $relations Relation name(s) to eager load
+     * @return self
+     */
+    public function with($relations): self
+    {
+        if (is_string($relations)) {
+            $relations = [$relations];
+        }
+
+        $this->eagerLoad = array_merge($this->eagerLoad, $relations);
+        return $this;
+    }
+
+    /**
+     * Load eager relationships for a collection of records
+     *
+     * @param array $records Array of ActiveRecord objects
+     * @return void
+     */
+    protected function loadEagerRelations(array $records): void
+    {
+        foreach ($this->eagerLoad as $relationName) {
+            // Validate relation exists
+            if (!isset($this->relations[$relationName])) {
+                throw new Exception("Relation '{$relationName}' is not defined");
+            }
+
+            $relationConfig = $this->relations[$relationName];
+
+            // Skip if already loaded as an object
+            if ($relationConfig instanceof self) {
+                continue;
+            }
+
+            // Extract relation configuration
+            $relationType = $relationConfig[0];
+            $relationClass = $relationConfig[1];
+            $keyField = $relationConfig[2];
+            $callbacks = $relationConfig[3] ?? [];
+            $backReference = $relationConfig[4] ?? '';
+
+            // Determine which keys to collect and which field to query
+            if ($relationType === self::BELONGS_TO) {
+                // For BELONGS_TO: collect foreign keys from current records, query by primary key
+                $keyValues = $this->collectUniqueValues($records, $keyField);
+                $relatedModel = new $relationClass($this->databaseConnection);
+                $queryField = $relatedModel->primaryKey;
+            } else {
+                // For HAS_ONE/HAS_MANY: collect primary keys from current records, query by foreign key
+                $keyValues = $this->collectUniqueValues($records, $this->primaryKey);
+                $relatedModel = new $relationClass($this->databaseConnection);
+                $queryField = $keyField;
+            }
+
+            if (empty($keyValues)) {
+                continue;
+            }
+
+            // Apply any additional conditions from relation config
+            if ($callbacks) {
+                foreach ($callbacks as $method => $args) {
+                    call_user_func_array([$relatedModel, $method], (array) $args);
+                }
+            }
+
+            // Fetch all related records in one query
+            $relatedRecords = $relatedModel->in($queryField, $keyValues)->findAll();
+
+            // Assign related records to parent records
+            $this->assignEagerLoadedRelations(
+                $records,
+                $relatedRecords,
+                $relationName,
+                $relationType,
+                $keyField,
+                $queryField,
+                $backReference,
+                $relationClass
+            );
+        }
+
+        // Clear eager load array for next query
+        $this->eagerLoad = [];
+    }
+
+    /**
+     * Collect unique values from a field across multiple records
+     *
+     * @param array $records Array of ActiveRecord objects
+     * @param string $field Field name to collect values from
+     * @return array Unique non-null values
+     */
+    protected function collectUniqueValues(array $records, string $field): array
+    {
+        $values = [];
+        foreach ($records as $record) {
+            if ($record->{$field} !== null) {
+                $values[] = $record->{$field};
+            }
+        }
+        return array_unique($values);
+    }
+
+    /**
+     * Assign eager loaded relations to parent records
+     *
+     * @param array $parentRecords Parent records
+     * @param array $relatedRecords Related records fetched from database
+     * @param string $relationName Name of the relation
+     * @param string $relationType Type of relation (HAS_MANY, HAS_ONE, BELONGS_TO)
+     * @param string $keyField The key field used for matching
+     * @param string $queryField The field that was queried
+     * @param string $backReference Optional back reference name
+     * @param string $relationClass Class name of related model
+     * @return void
+     */
+    protected function assignEagerLoadedRelations(
+        array $parentRecords,
+        array $relatedRecords,
+        string $relationName,
+        string $relationType,
+        string $keyField,
+        string $queryField,
+        string $backReference,
+        string $relationClass
+    ): void {
+        // Group related records by the query field for efficient lookup
+        $grouped = [];
+        foreach ($relatedRecords as $relatedRecord) {
+            $key = $relatedRecord->{$queryField};
+
+            if ($relationType === self::HAS_MANY) {
+                // HAS_MANY: group multiple records
+                if (!isset($grouped[$key])) {
+                    $grouped[$key] = [];
+                }
+                $grouped[$key][] = $relatedRecord;
+            } else {
+                // HAS_ONE/BELONGS_TO: take first match only
+                if (!isset($grouped[$key])) {
+                    $grouped[$key] = $relatedRecord;
+                }
+            }
+        }
+
+        // Assign to parent records
+        foreach ($parentRecords as $parentRecord) {
+            // Determine the lookup key based on relation type
+            if ($relationType === self::BELONGS_TO) {
+                $lookupKey = $parentRecord->{$keyField};
+            } else {
+                $lookupKey = $parentRecord->{$this->primaryKey};
+            }
+
+            // Assign the relation
+            if (isset($grouped[$lookupKey])) {
+                $relatedData = $grouped[$lookupKey];
+
+                // Set back reference if specified
+                if ($backReference) {
+                    if (is_array($relatedData)) {
+                        foreach ($relatedData as $relatedRecord) {
+                            $relatedRecord->__set($backReference, $parentRecord);
+                        }
+                    } else {
+                        $relatedData->__set($backReference, $parentRecord);
+                    }
+                }
+
+                $parentRecord->relations[$relationName] = $relatedData;
+            } else {
+                // No match found - set empty array for HAS_MANY, empty object for others
+                if ($relationType === self::HAS_MANY) {
+                    $parentRecord->relations[$relationName] = [];
+                } else {
+                    $parentRecord->relations[$relationName] = new $relationClass($this->databaseConnection);
+                }
+            }
+        }
     }
     /**
      * helper function to build SQL with sql parts.
@@ -758,7 +970,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     {
         if (is_array($value)) {
             foreach ($value as $key => $val) {
-				$value[$key] = $this->filterParam($val);
+                $value[$key] = $this->filterParam($val);
             }
         } elseif ($value === null) {
             $value = 'NULL';
@@ -768,7 +980,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
             $ph = ActiveRecordData::PREFIX . ++$this->count;
             $this->params[$ph] = $value;
             $value = $ph;
-		}
+        }
         return $value;
     }
 
@@ -805,8 +1017,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable
                 is_array($value)
                 ? new WrapExpressions(
                     'between' === strtolower($operator)
-                    ? [ 'target' => $value, 'start' => ' ', 'end' => ' ', 'delimiter' => ' AND ' ]
-                    : [ 'target' => $value ]
+                        ? ['target' => $value, 'start' => ' ', 'end' => ' ', 'delimiter' => ' AND ']
+                        : ['target' => $value]
                 )
                 : $value
             )
@@ -835,12 +1047,12 @@ abstract class ActiveRecord extends Base implements JsonSerializable
             'operator' => $type . ' JOIN',
             'target' => new Expressions(
                 [
-                        'source' => $table,
-                        'operator' => 'ON',
-                        'target' => $on
-                    ]
+                    'source' => $table,
+                    'operator' => 'ON',
+                    'target' => $on
+                ]
             )
-            ]);
+        ]);
         return $this;
     }
 
@@ -851,11 +1063,11 @@ abstract class ActiveRecord extends Base implements JsonSerializable
      */
     protected function addExpression(Expressions $expressions)
     {
-        $wrapExpressions =& $this->wrapExpressions;
+        $wrapExpressions = &$this->wrapExpressions;
         if (is_array($wrapExpressions) === false || count($wrapExpressions) === 0) {
-            $wrapExpressions = [ $expressions ];
+            $wrapExpressions = [$expressions];
         } else {
-            $wrapExpressions[] = new Expressions([ 'operator' => '', 'target' => $expressions ]);
+            $wrapExpressions[] = new Expressions(['operator' => '', 'target' => $expressions]);
         }
     }
 
@@ -891,7 +1103,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     protected function processEvent($event, array $data_to_pass = [])
     {
         if (is_array($event) === false) {
-            $event = [ $event ];
+            $event = [$event];
         }
 
         foreach ($event as $event_name) {
