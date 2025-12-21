@@ -542,17 +542,17 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $this->assertTrue($user->isHydrated());
     }
 
-	public function testIsHydratedGoodFindWithSelect()
-	{
+    public function testIsHydratedGoodFindWithSelect()
+    {
         $user = new User(new PDO('sqlite:test.db'));
         $user->name = 'bob';
         $user->password = 'pass';
         $user->save();
         $user->select('name')->find(1);
         $this->assertTrue($user->isHydrated());
-		$this->assertEmpty($user->password);
-		$this->assertEquals('bob', $user->name);
-	}
+        $this->assertEmpty($user->password);
+        $this->assertEquals('bob', $user->name);
+    }
 
     public function testIsHydratedGoodFindAll()
     {
@@ -729,38 +729,38 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $this->assertEquals('SELECT "user".* FROM "user" WHERE "user"."name" = :ph1 AND "user"."id" IN (:ph2,:ph3,:ph4) OR "user"."id" = :ph5 LIMIT 1', $sql);
     }
 
-	public function testBooleanParam()
-	{
-		$record = new User(new PDO('sqlite:test.db'));
-		$record->eq('name', 'John');
-		$record->eq('id', true);
-		$record->find();
-		$sql = $record->getBuiltSql();
-		$this->assertEquals('SELECT "user".* FROM "user" WHERE "user"."name" = :ph1 AND "user"."id" = TRUE LIMIT 1', $sql);
-	}
+    public function testBooleanParam()
+    {
+        $record = new User(new PDO('sqlite:test.db'));
+        $record->eq('name', 'John');
+        $record->eq('id', true);
+        $record->find();
+        $sql = $record->getBuiltSql();
+        $this->assertEquals('SELECT "user".* FROM "user" WHERE "user"."name" = :ph1 AND "user"."id" = TRUE LIMIT 1', $sql);
+    }
 
-	public function testBooleanParamWithArray()
-	{
-		$record = new User(new PDO('sqlite:test.db'));
-		$record->eq('name', 'John');
-		$record->in('id', [ true, false ]);
-		$record->find();
-		$sql = $record->getBuiltSql();
-		$this->assertEquals('SELECT "user".* FROM "user" WHERE "user"."name" = :ph1 AND "user"."id" IN (TRUE,FALSE) LIMIT 1', $sql);
-	}
+    public function testBooleanParamWithArray()
+    {
+        $record = new User(new PDO('sqlite:test.db'));
+        $record->eq('name', 'John');
+        $record->in('id', [ true, false ]);
+        $record->find();
+        $sql = $record->getBuiltSql();
+        $this->assertEquals('SELECT "user".* FROM "user" WHERE "user"."name" = :ph1 AND "user"."id" IN (TRUE,FALSE) LIMIT 1', $sql);
+    }
 
     public function testHasManyInvalidRelation()
     {
-        $user = new class(new PDO('sqlite:test.db')) extends User {
+        $user = new class (new PDO('sqlite:test.db')) extends User {
             public array $relations = [
                 'invalid_relation' => [] // Invalid - missing required elements
             ];
         };
-        
+
         $user->name = 'demo';
         $user->password = md5('demo');
         $user->insert();
-        
+
         // Should return empty array for invalid relation instead of throwing exception
         $this->assertIsArray($user->invalid_relation);
         $this->assertEmpty($user->invalid_relation);
@@ -771,7 +771,7 @@ class ActiveRecordPdoIntegrationTest extends \PHPUnit\Framework\TestCase
         $user->name = 'demo';
         $user->password = md5('demo');
         $user->insert();
-        
+
         // No contacts exist for this user
         $this->assertEmpty($user->contacts);
         $this->assertIsArray($user->contacts);

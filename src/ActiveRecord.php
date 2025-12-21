@@ -64,7 +64,8 @@ use PDO;
  * @method self offset(int $offset) Offset
  * @method self top(int $top) Top
  */
-abstract class ActiveRecord extends Base implements JsonSerializable {
+abstract class ActiveRecord extends Base implements JsonSerializable
+{
     public const BELONGS_TO = 'belongs_to';
     public const HAS_MANY = 'has_many';
     public const HAS_ONE = 'has_one';
@@ -164,7 +165,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      * @param ?string $table               The table name in database
      * @param array   $config              Manipulate any property in the object
      */
-    public function __construct($databaseConnection = null, ?string $table = '', array $config = []) {
+    public function __construct($databaseConnection = null, ?string $table = '', array $config = [])
+    {
         $this->processEvent('onConstruct', [$this, &$config]);
         $rawConnection = null;
         if ($databaseConnection !== null && ($databaseConnection instanceof DatabaseInterface) === false) {
@@ -198,7 +200,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      * @param array $args The arguments of the function.
      * @return mixed Return the result of callback or the current object to make chain method calls.
      */
-    public function __call($name, $args) {
+    public function __call($name, $args)
+    {
         $name = str_ireplace('by', '', $name);
         if (isset(ActiveRecordData::OPERATORS[$name]) === true) {
             $field = $args[0];
@@ -225,7 +228,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
     /**
      * magic function to SET values of the current object.
      */
-    public function __set($var, $val) {
+    public function __set($var, $val)
+    {
         if (array_key_exists($var, $this->sqlExpressions) || array_key_exists($var, ActiveRecordData::DEFAULT_SQL_EXPRESSIONS)) {
             $this->sqlExpressions[$var] = $val;
         } elseif (isset($this->relations[$var]) === true && $val instanceof self) {
@@ -239,7 +243,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
     /**
      * magic function to UNSET values of the current object.
      */
-    public function __unset($var) {
+    public function __unset($var)
+    {
         if (array_key_exists($var, $this->sqlExpressions)) {
             unset($this->sqlExpressions[$var]);
         }
@@ -257,7 +262,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
     /**
      * magic function to GET the values of current object.
      */
-    public function &__get($var) {
+    public function &__get($var)
+    {
         if (isset($this->sqlExpressions[$var]) === true) {
             return $this->sqlExpressions[$var];
         } elseif (isset($this->relations[$var]) === true) {
@@ -275,7 +281,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      * @param mixed $name the key name to check
      * @return boolean
      */
-    public function __isset($name) {
+    public function __isset($name)
+    {
         return isset($this->data[$name]) === true || isset($this->relations[$name]) === true || isset($this->customData[$name]) === true;
     }
 
@@ -286,7 +293,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      * @return void
      * @throws Exception
      */
-    protected function transformAndPersistConnection($rawConnection) {
+    protected function transformAndPersistConnection($rawConnection)
+    {
         if ($rawConnection instanceof PDO) {
             $this->databaseConnection = new \flight\database\pdo\PdoAdapter($rawConnection);
         } elseif ($rawConnection instanceof mysqli) {
@@ -303,7 +311,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      * @param mixed $value any value
      * @return void
      */
-    public function setCustomData(string $key, $value): void {
+    public function setCustomData(string $key, $value): void
+    {
         $this->customData[$key] = $value;
     }
 
@@ -314,7 +323,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      *
      * @return ActiveRecord return $this, can using chain method calls.
      */
-    public function reset(bool $include_query_data = true): self {
+    public function reset(bool $include_query_data = true): self
+    {
         $this->data = [];
         $this->customData = [];
         $this->isHydrated = false;
@@ -329,7 +339,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      *
      * @return ActiveRecord return $this, can using chain method calls.
      */
-    protected function resetQueryData(): self {
+    protected function resetQueryData(): self
+    {
         $this->params = [];
         $this->sqlExpressions = [];
         $this->join = null;
@@ -341,7 +352,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      * @param array $dirty The dirty data will be set, or empty array to reset the dirty data.
      * @return ActiveRecord return $this, can using chain method calls.
      */
-    public function dirty(array $dirty = []): self {
+    public function dirty(array $dirty = []): self
+    {
         $this->dirty = $dirty;
         $this->data = array_merge($this->data, $dirty);
         return $this;
@@ -352,7 +364,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      *
      * @return boolean
      */
-    public function isDirty(): bool {
+    public function isDirty(): bool
+    {
         return count($this->dirty) > 0;
     }
 
@@ -362,7 +375,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      * @param array $data data to copy into the model
      * @return self
      */
-    public function copyFrom(array $data = []): self {
+    public function copyFrom(array $data = []): self
+    {
         return $this->dirty($data);
     }
 
@@ -371,11 +385,13 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      *
      * @return boolean
      */
-    public function isHydrated(): bool {
+    public function isHydrated(): bool
+    {
         return $this->isHydrated;
     }
 
-    public function getData(): array {
+    public function getData(): array
+    {
         return $this->data;
     }
 
@@ -383,7 +399,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      * get the database connection.
      * @return DatabaseInterface
      */
-    public function getDatabaseConnection() {
+    public function getDatabaseConnection()
+    {
         return $this->databaseConnection;
     }
 
@@ -392,7 +409,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      * @param DatabaseInterface|mysqli|PDO $databaseConnection
      * @return void
      */
-    public function setDatabaseConnection($databaseConnection): void {
+    public function setDatabaseConnection($databaseConnection): void
+    {
         if (($databaseConnection instanceof DatabaseInterface) === true) {
             $this->databaseConnection = $databaseConnection;
         } else {
@@ -405,7 +423,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      *
      * @return string
      */
-    public function getDatabaseEngine(): string {
+    public function getDatabaseEngine(): string
+    {
         if ($this->databaseConnection instanceof PdoAdapter || is_subclass_of($this->databaseConnection, PDO::class) === true) {
             // returns value of mysql, pgsql, sqlite, oci, sqlsrv, odbc, ibm, informix, firebird, 4D, generic.
             return $this->databaseConnection->getConnection()->getAttribute(PDO::ATTR_DRIVER_NAME);
@@ -421,7 +440,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      * @param int|string $id If call this function using this param, will find record by using this id. If not set, just find the first record in database.
      * @return ActiveRecord Returns a hydrated ActiveRecord object if found, otherwise returns an empty ActiveRecord object.
      */
-    public function find($id = null) {
+    public function find($id = null)
+    {
         if ($id !== null) {
             $this->eq($this->primaryKey, $id);
         }
@@ -448,7 +468,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      * function to find all records in database.
      * @return array<int,ActiveRecord> return array of ActiveRecord
      */
-    public function findAll(): array {
+    public function findAll(): array
+    {
         $this->processEvent('beforeFindAll', [$this]);
 
         // Save eager load array before resetQueryData() clears it
@@ -469,7 +490,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      * Function to delete current record in database.
      * @return bool
      */
-    public function delete() {
+    public function delete()
+    {
         $this->processEvent('beforeDelete', [$this]);
         if (empty($this->sqlExpressions['where'])) {
             $this->eq($this->primaryKey, $this->{$this->primaryKey});
@@ -482,7 +504,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      * function to build insert SQL, and insert current record into database.
      * @return bool|ActiveRecord if insert success return current object
      */
-    public function insert(): ActiveRecord {
+    public function insert(): ActiveRecord
+    {
         // execute this before anything else, this could change $this->dirty
         $this->processEvent(['beforeInsert', 'beforeSave'], [$this]);
 
@@ -518,7 +541,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      * function to build update SQL, and update current record in database, just write the dirty data into database.
      * @return ActiveRecord if update success return current object
      */
-    public function update(): ActiveRecord {
+    public function update(): ActiveRecord
+    {
         $this->processEvent(['beforeUpdate', 'beforeSave'], [$this]);
 
         foreach ($this->dirty as $field => $value) {
@@ -540,7 +564,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      *
      * @return ActiveRecord
      */
-    public function save(): ActiveRecord {
+    public function save(): ActiveRecord
+    {
         if ($this->{$this->primaryKey} !== null && $this->isHydrated() === true) {
             $record = $this->update();
         } else {
@@ -564,7 +589,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      * @param array $params The param will be bind to PDOStatement.
      * @return DatabaseStatementInterface
      */
-    public function execute(string $sql, array $params = []): DatabaseStatementInterface {
+    public function execute(string $sql, array $params = []): DatabaseStatementInterface
+    {
         $statement = $this->databaseConnection->prepare($sql);
         $statement->execute($params);
 
@@ -582,7 +608,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      * @param bool $single if set to true, will find record and fetch in current object, otherwise will find all records.
      * @return ActiveRecord|array
      */
-    public function query(string $sql, array $param = [], ?ActiveRecord $obj = null, bool $single = false) {
+    public function query(string $sql, array $param = [], ?ActiveRecord $obj = null, bool $single = false)
+    {
         $called_class = get_called_class();
         $obj = $obj ?: new $called_class($this->databaseConnection);
 
@@ -611,7 +638,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      * @param string $name The name of the relation, the array key when defining the relation.
      * @return mixed
      */
-    protected function &getRelation(string $name) {
+    protected function &getRelation(string $name)
+    {
 
         // can't set the name of a relation to a protected keyword
         if (in_array($name, ['select', 'from', 'join', 'where', 'group', 'having', 'order', 'limit', 'offset'], true) === true) {
@@ -664,7 +692,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      * @param string|array $relations Relation name(s) to eager load
      * @return self
      */
-    public function with($relations): self {
+    public function with($relations): self
+    {
         if (is_string($relations)) {
             $relations = [$relations];
         }
@@ -679,7 +708,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      * @param array $records Array of ActiveRecord objects
      * @return void
      */
-    protected function loadEagerRelations(array $records): void {
+    protected function loadEagerRelations(array $records): void
+    {
         foreach ($this->eagerLoad as $relationName) {
             // Validate relation exists
             if (!isset($this->relations[$relationName])) {
@@ -751,7 +781,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      * @param string $field Field name to collect values from
      * @return array Unique non-null values
      */
-    protected function collectUniqueValues(array $records, string $field): array {
+    protected function collectUniqueValues(array $records, string $field): array
+    {
         $values = [];
         foreach ($records as $record) {
             if ($record->{$field} !== null) {
@@ -844,7 +875,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      * @param ActiveRecord $o The reference to $this
      * @return string
      */
-    protected function buildSqlCallback(string $sqlStatement, ActiveRecord $object): string {
+    protected function buildSqlCallback(string $sqlStatement, ActiveRecord $object): string
+    {
         // First add the SELECT table.*
         if ('select' === $sqlStatement && null == $object->$sqlStatement) {
             $sqlStatement = strtoupper($sqlStatement) . ' ' . $this->escapeIdentifier($object->table) . '.*';
@@ -864,7 +896,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      * @param array $sqlStatements The SQL part will be build.
      * @return string
      */
-    protected function buildSql(array $sqlStatements = []): string {
+    protected function buildSql(array $sqlStatements = []): string
+    {
         $finalSql = [];
         foreach ($sqlStatements as $sql) {
             $statement = $this->buildSqlCallback($sql, $this);
@@ -886,11 +919,13 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      *
      * @return string
      */
-    public function getBuiltSql(): string {
+    public function getBuiltSql(): string
+    {
         return $this->builtSql;
     }
 
-    public function startWrap(): self {
+    public function startWrap(): self
+    {
         $this->wrap = true;
         return $this;
     }
@@ -902,7 +937,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      * @param string|null $op If give this param will build one WrapExpressions include the stored expressions add into WHERE. Otherwise will stored the expressions into array.
      * @return self
      */
-    public function wrap(?string $op = null): self {
+    public function wrap(?string $op = null): self
+    {
         return $op === null ? $this->startWrap() : $this->endWrap($op);
     }
 
@@ -911,7 +947,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      * @param string $op If give this param will build one WrapExpressions include the stored expressions add into WHERE. Otherwise will stored the expressions into array.
      * @return ActiveRecord
      */
-    public function endWrap(string $op): self {
+    public function endWrap(string $op): self
+    {
         $this->wrap = false;
         if (is_array($this->wrapExpressions) === true && count($this->wrapExpressions) > 0) {
             $this->addCondition(new WrapExpressions([
@@ -929,7 +966,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      * @param mixed $value the value will bind to SQL, just store it in $this->params.
      * @return mixed $value
      */
-    protected function filterParam($value) {
+    protected function filterParam($value)
+    {
         if (is_array($value)) {
             foreach ($value as $key => $val) {
                 $value[$key] = $this->filterParam($val);
@@ -955,7 +993,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      * @param string $delimiter the operator to concat this Expressions into WHERE or SET statement.
      * @param string $name The Expression will contact to.
      */
-    public function addCondition($field, ?string $operator, $value, string $delimiter = 'AND', string $name = 'where') {
+    public function addCondition($field, ?string $operator, $value, string $delimiter = 'AND', string $name = 'where')
+    {
         // This will catch unique conditions such as IS NULL, IS NOT NULL, etc
         // You only need to filter by a param if there's a param to really filter by
         // A true null value is passed in from a endWrap() method to skip the param.
@@ -1001,7 +1040,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      * @param string $on The condition of ON
      * @param string $type The join type, like "LEFT", "INNER", "OUTER", "RIGHT"
      */
-    public function join(string $table, string $on, string $type = 'LEFT') {
+    public function join(string $table, string $on, string $type = 'LEFT')
+    {
         $this->join = new Expressions([
             'source' => $this->join ?? '',
             'operator' => $type . ' JOIN',
@@ -1021,7 +1061,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      * @param Expressions $exp The expression will be stored.
      * @param string $delimiter The operator to concat this Expressions into WHERE statement.
      */
-    protected function addExpression(Expressions $expressions) {
+    protected function addExpression(Expressions $expressions)
+    {
         $wrapExpressions = &$this->wrapExpressions;
         if (is_array($wrapExpressions) === false || count($wrapExpressions) === 0) {
             $wrapExpressions = [$expressions];
@@ -1036,7 +1077,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      * @param string $operator the operator to concat this Expressions into WHERE or SET statement.
      * @param string $name The Expression will contact to.
      */
-    protected function addConditionGroup(Expressions $expressions, string $operator, string $name = 'where') {
+    protected function addConditionGroup(Expressions $expressions, string $operator, string $name = 'where')
+    {
         if (!$this->{$name}) {
             $this->{$name} = new Expressions([
                 'operator' => strtoupper($name),
@@ -1058,7 +1100,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      * @param array  $data_to_pass Usually ends up being $this
      * @return void
      */
-    protected function processEvent($event, array $data_to_pass = []) {
+    protected function processEvent($event, array $data_to_pass = [])
+    {
         if (is_array($event) === false) {
             $event = [$event];
         }
@@ -1077,7 +1120,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      * @param string $name The database identifier to be escaped.
      * @return string The escaped database identifier.
      */
-    public function escapeIdentifier(string $name) {
+    public function escapeIdentifier(string $name)
+    {
         switch ($this->databaseEngineType) {
             case 'sqlite':
             case 'pgsql':
@@ -1095,7 +1139,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      * @inheritDoc
      */
     #[\ReturnTypeWillChange]
-    public function jsonSerialize() {
+    public function jsonSerialize()
+    {
         return $this->toArray();
     }
 
@@ -1104,7 +1149,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable {
      *
      * @return array
      */
-    public function toArray(): array {
+    public function toArray(): array
+    {
         return $this->data + $this->customData;
     }
 }

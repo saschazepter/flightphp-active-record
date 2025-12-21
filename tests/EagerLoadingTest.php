@@ -6,6 +6,7 @@ namespace flight\tests;
 
 use Exception;
 use flight\tests\classes\Contact;
+use flight\tests\classes\QueryCountingAdapter;
 use flight\tests\classes\User;
 use PDO;
 use PHPUnit\Framework\TestCase;
@@ -13,16 +14,19 @@ use PHPUnit\Framework\TestCase;
 /**
  * Test class for eager loading functionality
  */
-class EagerLoadingTest extends TestCase {
+class EagerLoadingTest extends TestCase
+{
     protected PDO $pdo;
     protected QueryCountingAdapter $countingAdapter;
 
-    public static function setUpBeforeClass(): void {
+    public static function setUpBeforeClass(): void
+    {
         require_once __DIR__ . '/classes/User.php';
         require_once __DIR__ . '/classes/Contact.php';
     }
 
-    public function setUp(): void {
+    public function setUp(): void
+    {
         $this->pdo = new PDO('sqlite::memory:');
         $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
@@ -45,7 +49,8 @@ class EagerLoadingTest extends TestCase {
         $this->countingAdapter = new QueryCountingAdapter($pdoAdapter);
     }
 
-    public function testHasManyEagerLoading(): void {
+    public function testHasManyEagerLoading(): void
+    {
         $user = new User($this->countingAdapter);
 
         // Eager load contacts
@@ -63,7 +68,8 @@ class EagerLoadingTest extends TestCase {
         $this->assertEquals('user1-contact2@example.com', $users[0]->contacts[1]->email);
     }
 
-    public function testHasOneEagerLoading(): void {
+    public function testHasOneEagerLoading(): void
+    {
         $user = new User($this->countingAdapter);
 
         // Eager load single contact
@@ -80,7 +86,8 @@ class EagerLoadingTest extends TestCase {
         $this->assertNotEmpty($users[0]->contact->email);
     }
 
-    public function testBelongsToEagerLoading(): void {
+    public function testBelongsToEagerLoading(): void
+    {
         $contact = new Contact($this->countingAdapter);
 
         // Eager load users
@@ -101,7 +108,8 @@ class EagerLoadingTest extends TestCase {
         $this->assertEquals('User 3', $contacts[3]->user->name);
     }
 
-    public function testMultipleRelationsEagerLoading(): void {
+    public function testMultipleRelationsEagerLoading(): void
+    {
         $user = new User($this->countingAdapter);
 
         // Eager load multiple relations
@@ -114,7 +122,8 @@ class EagerLoadingTest extends TestCase {
         $this->assertInstanceOf(Contact::class, $users[0]->contact);
     }
 
-    public function testQueryCountReduction(): void {
+    public function testQueryCountReduction(): void
+    {
         // Test lazy loading (N+1 problem)
         $this->countingAdapter->reset();
         $user = new User($this->countingAdapter);
@@ -140,7 +149,8 @@ class EagerLoadingTest extends TestCase {
         $this->assertGreaterThan($eagerQueryCount, $lazyQueryCount);
     }
 
-    public function testEagerLoadingWithFind(): void {
+    public function testEagerLoadingWithFind(): void
+    {
         $user = new User($this->countingAdapter);
 
         // Eager load with find()
@@ -151,7 +161,8 @@ class EagerLoadingTest extends TestCase {
         $this->assertCount(2, $foundUser->contacts);
     }
 
-    public function testEagerLoadingWithBackReference(): void {
+    public function testEagerLoadingWithBackReference(): void
+    {
         $user = new User($this->countingAdapter);
 
         // Eager load with back reference
@@ -165,7 +176,8 @@ class EagerLoadingTest extends TestCase {
         $this->assertEquals($users[0]->id, $firstContact->user->id);
     }
 
-    public function testEagerLoadingWithCallbacks(): void {
+    public function testEagerLoadingWithCallbacks(): void
+    {
         $user = new User($this->countingAdapter);
 
         // The 'contact' relation has callbacks defined: ['where' => '1', 'order' => 'id desc']
@@ -177,7 +189,8 @@ class EagerLoadingTest extends TestCase {
         $this->assertInstanceOf(Contact::class, $users[0]->contact);
     }
 
-    public function testEagerLoadingWithEmptyResults(): void {
+    public function testEagerLoadingWithEmptyResults(): void
+    {
         // Delete all users
         $this->pdo->exec('DELETE FROM user');
 
@@ -188,7 +201,8 @@ class EagerLoadingTest extends TestCase {
         // Should not throw any errors
     }
 
-    public function testEagerLoadingWithNoMatches(): void {
+    public function testEagerLoadingWithNoMatches(): void
+    {
         // Create a user with no contacts
         $this->pdo->exec("INSERT INTO user (name, password, created_dt) VALUES ('User 4', 'pass4', '2024-01-04 00:00:00')");
 
@@ -200,7 +214,8 @@ class EagerLoadingTest extends TestCase {
         $this->assertCount(0, $users[0]->contacts); // Empty array for HAS_MANY
     }
 
-    public function testBackwardCompatibilityLazyLoading(): void {
+    public function testBackwardCompatibilityLazyLoading(): void
+    {
         $user = new User($this->countingAdapter);
 
         // Without with(), should still use lazy loading
@@ -213,7 +228,8 @@ class EagerLoadingTest extends TestCase {
         $this->assertCount(2, $contacts);
     }
 
-    public function testInvalidRelationThrowsException(): void {
+    public function testInvalidRelationThrowsException(): void
+    {
         $this->expectException(Exception::class);
         $this->expectExceptionMessage("Relation 'invalid_relation' is not defined");
 
@@ -221,7 +237,8 @@ class EagerLoadingTest extends TestCase {
         $user->with('invalid_relation')->findAll();
     }
 
-    public function testWithAcceptsStringAndArray(): void {
+    public function testWithAcceptsStringAndArray(): void
+    {
         $user = new User($this->countingAdapter);
 
         // Test with string
@@ -234,7 +251,8 @@ class EagerLoadingTest extends TestCase {
         $this->assertCount(3, $users2);
     }
 
-    public function testEagerLoadingWithAllNullForeignKeys(): void {
+    public function testEagerLoadingWithAllNullForeignKeys(): void
+    {
         // Create contacts with null user_id to test the empty keyValues scenario
         $this->pdo->exec('DELETE FROM contact');
         $this->pdo->exec("INSERT INTO contact (user_id, email, address) VALUES (NULL, 'orphan1@example.com', 'Address 1')");
@@ -252,7 +270,8 @@ class EagerLoadingTest extends TestCase {
         $this->assertFalse($contacts[0]->user->isHydrated());
     }
 
-    public function testBelongsToEagerLoadingWithBackReference(): void {
+    public function testBelongsToEagerLoadingWithBackReference(): void
+    {
         $contact = new Contact($this->countingAdapter);
 
         // Eager load users with back reference (user_with_backref relation)
@@ -273,7 +292,8 @@ class EagerLoadingTest extends TestCase {
         $this->assertContains($user->contact->id, [1, 2]); // Contact IDs 1 and 2 both belong to User 1
     }
 
-    public function testHasOneEagerLoadingWithNoMatches(): void {
+    public function testHasOneEagerLoadingWithNoMatches(): void
+    {
         // Create a user with no contacts to test HAS_ONE with no match
         $this->pdo->exec("INSERT INTO user (name, password, created_dt) VALUES ('User 4', 'pass4', '2024-01-04 00:00:00')");
 
@@ -289,7 +309,8 @@ class EagerLoadingTest extends TestCase {
         $this->assertFalse($users[0]->contact->isHydrated());
     }
 
-    public function testEagerLoadingSkipsAlreadyLoadedRelations(): void {
+    public function testEagerLoadingSkipsAlreadyLoadedRelations(): void
+    {
         $user = new User($this->countingAdapter);
 
         // Find a user first
@@ -309,34 +330,5 @@ class EagerLoadingTest extends TestCase {
 
         // The eager loading query should have been skipped (only 1 query for users, not 2)
         $this->assertEquals(1, $this->countingAdapter->getQueryCount());
-    }
-}
-
-/**
- * Test helper class to track SQL queries
- */
-class QueryCountingAdapter implements \flight\database\DatabaseInterface {
-    private \flight\database\DatabaseInterface $wrappedAdapter;
-    public array $executedQueries = [];
-
-    public function __construct(\flight\database\DatabaseInterface $adapter) {
-        $this->wrappedAdapter = $adapter;
-    }
-
-    public function prepare(string $sql): \flight\database\DatabaseStatementInterface {
-        $this->executedQueries[] = $sql;
-        return $this->wrappedAdapter->prepare($sql);
-    }
-
-    public function lastInsertId() {
-        return $this->wrappedAdapter->lastInsertId();
-    }
-
-    public function getQueryCount(): int {
-        return count($this->executedQueries);
-    }
-
-    public function reset(): void {
-        $this->executedQueries = [];
     }
 }
