@@ -446,6 +446,43 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     }
 
     /**
+     * Syncs declared public properties into the internal $data array.
+     *
+     * PDO::FETCH_INTO sets typed public properties directly, bypassing __set(),
+     * so $data stays empty. This method detects initialized declared properties
+     * and copies them into $data so that isHydrated() and getData() work
+     * correctly with subclasses that use typed properties.
+     */
+    protected function syncDeclaredProperties(): void
+    {
+        $ref = new \ReflectionClass($this);
+        $parentRef = new \ReflectionClass(self::class);
+
+        // If the primary key isn't initialized, no row was fetched — nothing to sync
+        $pkProp = $ref->hasProperty($this->primaryKey) ? $ref->getProperty($this->primaryKey) : null;
+        if ($pkProp !== null && !$pkProp->isInitialized($this)) {
+            return;
+        }
+
+        foreach ($ref->getProperties(\ReflectionProperty::IS_PUBLIC) as $prop) {
+            if ($prop->isStatic()) {
+                continue;
+            }
+
+            $name = $prop->getName();
+
+            // Skip properties that exist on ActiveRecord (even if redeclared by subclass)
+            if ($parentRef->hasProperty($name)) {
+                continue;
+            }
+
+            if ($prop->isInitialized($this) && !array_key_exists($name, $this->data)) {
+                $this->data[$name] = $this->{$name};
+            }
+        }
+    }
+
+    /**
      * get the database connection.
      * @return DatabaseInterface
      */
@@ -676,6 +713,8 @@ abstract class ActiveRecord extends Base implements JsonSerializable
         if ($single === true) {
             // fetch results into the object
             $sth->fetch($obj);
+            // Sync typed public properties that PDO::FETCH_INTO set directly
+            $obj->syncDeclaredProperties();
             // clear any dirty data
             $obj->dirty();
             $obj->isHydrated = count($obj->getData()) > 0;
@@ -683,6 +722,7 @@ abstract class ActiveRecord extends Base implements JsonSerializable
         }
         $result = [];
         while ($obj = $sth->fetch($obj)) {
+            $obj->syncDeclaredProperties();
             $new_obj = clone $obj->dirty();
             $new_obj->isHydrated = count($new_obj->getData()) > 0;
             $result[] = $new_obj;
