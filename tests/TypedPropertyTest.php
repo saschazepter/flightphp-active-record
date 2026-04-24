@@ -48,11 +48,22 @@ class TypedPropertyTest extends \PHPUnit\Framework\TestCase
         $user->password = 'hash3';
         $user->insert();
 
-        // Verify persisted via raw query (avoids isHydrated/lastInsertId dependencies)
+        // Verify persisted via raw query
         $row = $this->pdo->query("SELECT * FROM user WHERE name = 'charlie'")->fetch(PDO::FETCH_ASSOC);
         $this->assertNotFalse($row, 'insert should persist when properties are set directly');
         $this->assertSame('charlie', $row['name']);
         $this->assertSame('hash3', $row['password']);
+    }
+
+    public function testInsertSetsTypedIntId(): void
+    {
+        $user = new TypedUser($this->pdo);
+        $user->name = 'charlie';
+        $user->password = 'hash3';
+        $user->insert();
+
+        $this->assertIsInt($user->id, 'id should be int after insert, not string');
+        $this->assertGreaterThan(0, $user->id);
     }
 
     public function testUpdateWithTypedProperties(): void
@@ -62,7 +73,6 @@ class TypedPropertyTest extends \PHPUnit\Framework\TestCase
         $user = new TypedUser($this->pdo);
         $user->eq('name', 'eve')->find();
 
-        // Direct property assignment should be detected by syncDirtyFromProperties
         $user->name = 'eve_updated';
         $user->save();
 
