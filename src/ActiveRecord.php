@@ -396,6 +396,56 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     }
 
     /**
+     * Syncs declared public properties into $dirty for insert/update.
+     *
+     * Direct assignment to typed public properties bypasses __set(), so
+     * $dirty stays empty. This method detects initialized declared properties
+     * and copies them into $dirty so insert() and update() pick them up.
+     *
+     * @param bool $onlyChanged When true, only sync properties whose value
+     *                          differs from $data (for update). When false,
+     *                          sync all initialized properties (for insert).
+     */
+    protected function syncDirtyFromProperties(bool $onlyChanged = false): void
+    {
+        $ref = new \ReflectionClass($this);
+        $parentRef = new \ReflectionClass(self::class);
+
+        foreach ($ref->getProperties(\ReflectionProperty::IS_PUBLIC) as $prop) {
+            if ($prop->isStatic()) {
+                continue;
+            }
+
+            // Skip properties that exist on ActiveRecord (even if redeclared by subclass)
+            if ($parentRef->hasProperty($prop->getName())) {
+                continue;
+            }
+
+            $name = $prop->getName();
+
+            // Skip the primary key
+            if ($name === $this->primaryKey) {
+                continue;
+            }
+
+            if (!$prop->isInitialized($this) || array_key_exists($name, $this->dirty)) {
+                continue;
+            }
+
+            $currentValue = $this->{$name};
+
+            if ($onlyChanged) {
+                $storedValue = $this->data[$name] ?? null;
+                if ($currentValue != $storedValue) {
+                    $this->dirty[$name] = $currentValue;
+                }
+            } else {
+                $this->dirty[$name] = $currentValue;
+            }
+        }
+    }
+
+    /**
      * get the database connection.
      * @return DatabaseInterface
      */
@@ -509,6 +559,10 @@ abstract class ActiveRecord extends Base implements JsonSerializable
         // execute this before anything else, this could change $this->dirty
         $this->processEvent(['beforeInsert', 'beforeSave'], [$this]);
 
+        // Sync typed public properties into dirty — direct assignment to
+        // declared properties bypasses __set() and leaves dirty empty.
+        $this->syncDirtyFromProperties(false);
+
         if (count($this->dirty) === 0) {
             return $this->resetQueryData();
         }
@@ -544,6 +598,9 @@ abstract class ActiveRecord extends Base implements JsonSerializable
     public function update(): ActiveRecord
     {
         $this->processEvent(['beforeUpdate', 'beforeSave'], [$this]);
+
+        // Sync typed public properties that changed since the last find/sync.
+        $this->syncDirtyFromProperties(true);
 
         foreach ($this->dirty as $field => $value) {
             $this->addCondition($field, '=', $value, ',', 'set');
