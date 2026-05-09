@@ -6,8 +6,8 @@ use flight\tests\classes\TypedUser;
 use PDO;
 
 /**
- * Tests that insert() and update() correctly handle typed public properties
- * when values are assigned directly (bypassing __set / dirty tracking).
+ * Tests that ActiveRecord works correctly with subclasses that declare
+ * typed public properties (e.g. public int $id, public string $name).
  */
 class TypedPropertyTest extends \PHPUnit\Framework\TestCase
 {
@@ -48,24 +48,31 @@ class TypedPropertyTest extends \PHPUnit\Framework\TestCase
         $user->password = 'hash3';
         $user->insert();
 
-        // Verify persisted via raw query (avoids isHydrated/lastInsertId dependencies)
+        // Verify persisted via raw query
         $row = $this->pdo->query("SELECT * FROM user WHERE name = 'charlie'")->fetch(PDO::FETCH_ASSOC);
         $this->assertNotFalse($row, 'insert should persist when properties are set directly');
         $this->assertSame('charlie', $row['name']);
         $this->assertSame('hash3', $row['password']);
     }
 
+    public function testInsertSetsTypedIntId(): void
+    {
+        $user = new TypedUser($this->pdo);
+        $user->name = 'charlie';
+        $user->password = 'hash3';
+        $user->insert();
+
+        $this->assertIsInt($user->id, 'id should be int after insert, not string');
+        $this->assertGreaterThan(0, $user->id);
+    }
+
     public function testUpdateWithTypedProperties(): void
     {
         $this->pdo->exec("INSERT INTO user (name, password) VALUES ('eve', 'hash5')");
 
-        // Use the untyped User to find (avoids isHydrated dependency)
-        // Then update via typed property assignment
         $user = new TypedUser($this->pdo);
-        $user->dirty(['name' => 'eve']); // simulate populating data
         $user->eq('name', 'eve')->find();
 
-        // Direct property assignment should be detected by syncDirtyFromProperties
         $user->name = 'eve_updated';
         $user->save();
 
@@ -85,5 +92,37 @@ class TypedPropertyTest extends \PHPUnit\Framework\TestCase
         $row = $this->pdo->query("SELECT * FROM user WHERE id = 1")->fetch(PDO::FETCH_ASSOC);
         $this->assertSame('frank_updated', $row['name']);
         $this->assertSame('hash6', $row['password'], 'unchanged field should not be modified');
+    }
+
+    public function testFindIsHydrated(): void
+    {
+        $this->pdo->exec("INSERT INTO user (name, password) VALUES ('alice', 'hash1')");
+
+        $user = new TypedUser($this->pdo);
+        $user->eq('id', 1)->find();
+
+        $this->assertTrue($user->isHydrated(), 'isHydrated() should return true after find()');
+        $this->assertSame(1, $user->id);
+        $this->assertSame('alice', $user->name);
+    }
+
+    public function testFindNoResultIsNotHydrated(): void
+    {
+        $user = new TypedUser($this->pdo);
+        $user->eq('id', 999)->find();
+
+        $this->assertFalse($user->isHydrated(), 'isHydrated() should return false when no row is found');
+    }
+
+    public function testFindAllIsHydrated(): void
+    {
+        $this->pdo->exec("INSERT INTO user (name, password) VALUES ('alice', 'hash1')");
+        $this->pdo->exec("INSERT INTO user (name, password) VALUES ('bob', 'hash2')");
+
+        $users = (new TypedUser($this->pdo))->findAll();
+
+        $this->assertCount(2, $users);
+        $this->assertTrue($users[0]->isHydrated(), 'findAll() results should be hydrated');
+        $this->assertTrue($users[1]->isHydrated());
     }
 }
